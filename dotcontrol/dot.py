@@ -1,6 +1,7 @@
 import os
 from pathlib import Path
-from .util import link_dir
+from shutil import rmtree
+from .util import link_dir, iterdirp, mkdirp, now, sha1_hash, sha1_hash_dir
 
 
 class Dot:
@@ -13,7 +14,7 @@ class Dot:
 		else:
 			if create:
 				self.create()
-	
+		
 	def load(self):
 		self.data = self.profile.config['dots'][self.normalized_origin_path]
 	
@@ -24,10 +25,11 @@ class Dot:
 		from .const import DOT_DATA_TEMPLATE
 		self.data = self.profile.config['dots'][self.normalized_origin_path] = DOT_DATA_TEMPLATE.copy()
 		if self.absolute_origin_path.is_dir():
-			self.type = 'dir'
+			self.data['type'] = 'dir'
 		elif self.absolute_origin_path.is_file():
-			self.type = 'file'
+			self.data['type'] = 'file'
 		self.update_sha1_check()
+		self.save()
 
 
 	def resolve_path(self, raw_origin_path):
@@ -44,7 +46,6 @@ class Dot:
 
 	def link_dot(self):
 		'''Link origin to dot path.'''
-		from .util import mkdirp
 
 		mkdirp(self.dot_path.parent)
 
@@ -73,36 +74,41 @@ class Dot:
 			link_dir(self.dot_path, self.absolute_origin_path)
 
 	def unlink(self):
-		if self.dot_exists():
+		if self.dot_exists:
 			if self.type == 'file':
-				self.unlink()
+				self.dot_path.unlink()
 			elif self.type == 'dir':
-				from shutil import rmtree
 				rmtree(self.dot_path)
 
 	def delete(self):
-		if self.dot_exists:
-			self.dot_path.unlink()
+		self.unlink()
 		self.profile.config['dots'].pop(self.normalized_origin_path, None)
 		self.profile.save()
 
 	def sha1_hash(self):
 		if self.type == 'file':
-			from .util import sha1_hash
 			return sha1_hash(self.absolute_origin_path)
 		elif self.type == 'dir':
-			from .util import sha1_hash_dir
 			return sha1_hash_dir(self.absolute_origin_path)
 	
 	def update_sha1_check(self):
-		from .util import now
 		self.data['sha1'] = self.sha1_hash()
 		self.data['last_sha1_check'] = now()
 		self.save()
 
 	@property
 	def changed(self):
-		return self.sha1_hash() != self.data['sha1']
+		if self.type == 'file':
+			return self.sha1_hash() != self.data['sha1']
+		elif self.type == 'dir':
+			for item in iterdirp(self.absolute_origin_path):
+				item_relative = item.relative_to(self.absolute_origin_path).as_posix()
+				if item_relative not in self.data['sha1']:
+					return True
+				else:
+					if sha1_hash(item) != self.data['sha1'][item_relative]:
+						return True
+		return False
 
 	@property
 	def origin_exists(self):

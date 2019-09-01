@@ -62,9 +62,11 @@ class Profile:
 
 	def set_dot(self, path):
 		dot = Dot(self, path)
+		dot.update_sha1_check()
 		self.save()
 		if not dot.dot_exists or dot.type == 'dir' and dot.changed:
 			dot.link_dot()
+		return dot
 
 	def delete_dot(self, path):
 		Dot(self, path, create=False).delete()
