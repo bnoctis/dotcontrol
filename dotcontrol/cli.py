@@ -1,13 +1,19 @@
 import click
 from .control import Control
+from .util import timestamp2iso
 
 
 control = Control()
 
-context_settings = {
-	'help_option_names': ('-h', '--help')
+
+ctx_pass_through_args = {
+	'ignore_unknown_options': True
 }
-@click.group(context_settings=context_settings)
+
+
+@click.group(context_settings={
+	'help_option_names': ('-h', '--help')
+})
 def cli():
 	'''
 	dotcontrol is a dot file manager.
@@ -17,7 +23,8 @@ def cli():
 @cli.command('.', help='list dots in a profile.')
 @click.option('-p', '--profile', help='specify profile(s) to list, separate with comma withour whitespace.')
 @click.option('-a', '--all', is_flag=True, help='list dots in all profiles.')
-def list_dots(profile, all):
+@click.option('-l', '--detail', is_flag=True, help='also list details about dots.')
+def list_dots(profile, all, detail):
 	if all:
 		profiles = control.iter_profiles()
 	else:
@@ -30,7 +37,18 @@ def list_dots(profile, all):
 		for dot in profile.iter_dots():
 			if dot.changed:
 				click.secho('* ', fg='red', nl=False)
-			click.secho(dot.normalized_origin_path, bold=True)
+			if detail:
+				click.secho(timestamp2iso(dot.last_sha1_check), nl=False)
+				click.echo(' ', nl=False)
+			click.secho(dot.normalized_origin_path, bold=(dot.type =='dir'), nl=not detail)
+			if detail:
+				click.echo(' ', nl=False)
+				if dot.type == 'file':
+					click.echo(dot.sha1)
+				elif dot.type == 'dir':
+					click.echo()
+					for k in dot.sha1:
+						click.echo('{} {}'.format(dot.sha1[k], k))
 
 
 @cli.command('+', help='add or update dot(s).')
@@ -43,7 +61,9 @@ def set_dots(profile, paths):
 		profile = control.get_profile(profile)
 	
 	for path in paths:
-		profile.set_dot(path)
+		dot = profile.set_dot(path)
+		click.echo('added ', nl=False)
+		click.secho(dot.normalized_origin_path, fg='cyan')
 
 
 @cli.command('-', help='delete dot(s).')
@@ -59,7 +79,7 @@ def delete_dots(profile, paths):
 		profile.delete_dot(path)
 
 
-@cli.command('p', help='list profiles, or switch to a profile is specifed, which will be created if not existing yet.')
+@cli.command('p', help='list profiles, or switch to a profile if specifed, which will be created if not existing yet.')
 @click.argument('profile', nargs=1, required=False)
 def list_or_switch_profile(profile):
 	if profile:
@@ -99,26 +119,38 @@ def set_sync(type, remote):
 	control.set_sync(type, remote)
 
 
-@cli.command('=.', help='commit changes. may add arguments of configured sync program.')
-@click.argument('args', nargs=-1)
+@cli.command('=.', context_settings=ctx_pass_through_args, help='commit changes. may add arguments of configured sync program.')
+@click.argument('args', nargs=-1, type=click.UNPROCESSED)
 def commit_changes(args):
-	control.commit_changes(*args)
+	try:
+		control.commit_changes(*args)
+	except Exception as e:
+		click.secho('Error: ', fg='bright_red', nl=False)
+		click.echo(e)
 
 
-@cli.command('[=', help='pull from remote. may add arguments of configured sync program.')
-@click.argument('args', nargs=-1)
+@cli.command('[=', context_settings=ctx_pass_through_args, help='pull from remote. may add arguments of configured sync program.')
+@click.argument('args', nargs=-1, type=click.UNPROCESSED)
 def sync_pull(args):
-	control.sync_pull(*args)
+	try:
+		control.sync_pull(*args)
+	except Exception as e:
+		click.secho('Error: ', fg='bright_red', nl=False)
+		click.echo(e)
 
 
-@cli.command('=]', help='push to remote. may add arguments of configured sync program.')
-@click.argument('args', nargs=-1)
+@cli.command('=]', context_settings=ctx_pass_through_args, help='push to remote. may add arguments of configured sync program.')
+@click.argument('args', nargs=-1, type=click.UNPROCESSED)
 def sync_push(args):
-	control.sync_push(*args)
+	try:
+		control.sync_push(*args)
+	except Exception as e:
+		click.secho('Error: ', fg='bright_red', nl=False)
+		click.echo(e)
 
 
-@cli.command('=', help='list sync info, or run commands of configure sync program, if specifed.')
-@click.argument('args', nargs=-1)
+@cli.command('=', context_settings=ctx_pass_through_args, help='list sync info, or run commands of configure sync program, if specifed.')
+@click.argument('args', nargs=-1, type=click.UNPROCESSED)
 def sync_info_or_run_command(args):
 	if len(args) is 0:
 		click.secho('sync type', fg='cyan', nl=False)
@@ -126,7 +158,11 @@ def sync_info_or_run_command(args):
 		click.secho('sync remote', fg='cyan', nl=False)
 		click.echo(': {}'.format(control.config['sync_remote']))
 	else:
-		control.sync_command(*args)
+		try:
+			control.sync_command(*args)
+		except Exception as e:
+			click.secho('Error: ', fg='bright_red', nl=False)
+			click.echo(e)
 
 
 @cli.command('[-', help='discard last changes to dot(s).')
