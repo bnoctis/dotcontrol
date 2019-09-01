@@ -1,6 +1,6 @@
 import toml
-from pathlib import Path
 import subprocess as sp
+from pathlib import Path
 from .profile import Profile
 from .util import keep_cwd
 
@@ -57,8 +57,7 @@ class Control:
 	
 	def pull_remote_profiles(self):
 		if self.config['sync_type'] == 'git':
-			with keep_cwd(self.root_path):
-				sp.run(['git', 'submodule', 'update', '-f', '--'])
+			self.sync_command('submodule', 'update', '-f', '--')
 	
 	def set_dot(self, path):
 		self.current_profile.set_dot(path)
@@ -96,14 +95,23 @@ class Control:
 		self.save()
 	
 	def sync_command(self, *args):
+		if 'sync_program' not in self.config:
+			raise Exception('Sync program not configured.')
 		with keep_cwd(self.root_path):
 			sp.run([self.config['sync_program']] + list(args))
 
 	def sync_pull(self, *args):
+		if 'sync_program' not in self.config:
+			raise Exception('Sync program not configured.')
+		
 		if self.config['sync_type'] == 'git':
 			self.sync_command('pull', *args)
+			self.pull_remote_profiles()
 	
 	def sync_push(self, *args):
+		if 'sync_program' not in self.config:
+			raise Exception('Sync program not configured.')
+		
 		if self.config['sync_type'] == 'git':
 			self.sync_command('push', *args)
 	
