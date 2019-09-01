@@ -1,9 +1,22 @@
+import subprocess as sp
+from time import time
+from datetime import datetime
+from os import getcwd, chdir, link, path
+from hashlib import sha1
+from pathlib import Path
+from shutil import rmtree
+
+
 FILE_READ_CHUNK_SIZE = 4096
 
 
 def now():
-	from time import time
 	return int(time())
+
+
+def timestamp2iso(ts):
+	# YYYY-MM-DDTHH:MM:SS
+	return datetime.fromtimestamp(ts).isoformat()[:19]
 
 
 def mkdirp(dest):
@@ -22,7 +35,7 @@ def mkdirp(dest):
 def iterdirp(path, files_only=False, ignore_errors=False):
 	'''Recursively iterate over directories and files under `path`.'''
 
-	dirs = [item for item in path.iterdir() if item.is_dir()]
+	dirs = [path]
 	dir = None
 	while dirs:
 		dir = dirs.pop(0)
@@ -45,32 +58,27 @@ class keep_cwd:
 	Use `with keep_cwd(optional_target_path)` to go back to `cwd` after
 	working in other directory(-ies).
 	'''
-	from os import getcwd, chdir
 
 	def __init__(self, to=None):
 		self.to = to
 
 	def __enter__(self):
-		self.cwd = self.getcwd()
+		self.cwd = getcwd()
 		if self.to:
-			self.chdir(self.to)
+			chdir(self.to)
 	
 	def __exit__(self, *args, **kwargs):
-		self.chdir(self.cwd)
+		chdir(self.cwd)
 
 
 def link_dir(source, target):
 	'''Recursively create directory structure and hard link files.'''
 
-	from os import link
-
 	for item in iterdirp(source):
-		if item.is_dir():
-			target_item = target.joinpath(item.relative_to(source))			
-			if not target_item.exists():
-				mkdirp(target_item)
-		else:
-			link(item, target.joinpath(item.relative_to(source)))
+		if not item.is_dir():
+			item_target = target.joinpath(item.relative_to(source))
+			mkdirp(item_target.parent)
+			link(item, item_target)
 
 
 def sha1_hash(object):
@@ -78,13 +86,11 @@ def sha1_hash(object):
 	Calculate hex digest for input.
 	Argument may be a string, bytes object, or a path-like object.
 	'''
-
-	from hashlib import sha1
-	from pathlib import Path
 	
 	if type(object) in (str, bytes):
 		return sha1(object).hexdigest()
-	elif Path(object).exists():
+	path = Path(object)
+	if path.exists():
 		with open(object, 'rb') as f:
 			hash = sha1()
 			buf = f.read(FILE_READ_CHUNK_SIZE)
@@ -127,9 +133,6 @@ def delete_git_submodule(repo_root, path):
 	Solution is from https://stackoverflow.com/a/16162000 . Thanks @VonC !
 	'''
 
-	from os import getcwd, chdir, path
-	import subprocess as sp
-	from shutil import rmtree
 	with keep_cwd(repo_root):
 		sp.run(['git', 'submodule', 'deinit', '-f', '--', path])
 		rmtree(path.join(repo_root, path))
