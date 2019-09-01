@@ -47,7 +47,7 @@ Delete one or more profiles. Source file(s) won't be deleted.
 
 Set up a remote profile. Currently supports
 
-* git submodule, with `type` set to `git`.
+* git , with `type` set to `git`.
 
 `.c =+ type remote`
 
