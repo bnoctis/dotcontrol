@@ -1,14 +1,9 @@
+CONTROL_CONFIG_TEMPLATE = {
+	'current_profile': 'main'
+}
 PROFILE_CONFIG_TEMPLATE = {
 	'sync_type': 'local',
 	'dots': {}
-}
-DEFAULT_CONFIG = {
-	'current_profile': 'main',
-	'sync_type': 'local',
-	'sync_remote': '.',
-	'profiles': {
-		'main': PROFILE_CONFIG_TEMPLATE.copy()
-	}
 }
 DOT_DATA_TEMPLATE = {
 	'type': 'file',

@@ -5,9 +5,21 @@ from os import getcwd, chdir, link, path
 from hashlib import sha1
 from pathlib import Path
 from shutil import rmtree
+import toml
 
 
 FILE_READ_CHUNK_SIZE = 4096
+
+
+def read_config(path):
+	try:
+		return toml.loads(path.read_text())
+	except:
+		pass
+
+
+def write_config(path, data):
+	path.write_text(toml.dumps(data))
 
 
 def now():
@@ -26,13 +38,13 @@ def mkdirp(dest):
 	'''
 
 	if not dest.exists():
-		for path in reversed(dest.parents):
-			if not path.exists():
-				path.mkdir()
+		for parent in reversed(dest.parents):
+			if not parent.exists():
+				parent.mkdir()
 		dest.mkdir()
 
 
-def iterdirp(path, files_only=False, ignore_errors=False):
+def iterdirp(path, files_only=False, dirs_only=False, ignore_errors=False):
 	'''Recursively iterate over directories and files under `path`.'''
 
 	dirs = [path]
@@ -45,6 +57,8 @@ def iterdirp(path, files_only=False, ignore_errors=False):
 					dirs.append(item)
 					if files_only:
 						continue
+				elif item.is_file() and dirs_only:
+					continue
 				yield item
 		except Exception as e:
 			if ignore_errors:
@@ -125,15 +139,3 @@ def compare_files_in_chunks(a, b):
 			return False
 		elif buf_a != buf_b:
 			return True
-
-
-def delete_git_submodule(repo_root, path):
-	'''
-	Delete a submodule from a Git repository.
-	Solution is from https://stackoverflow.com/a/16162000 . Thanks @VonC !
-	'''
-
-	with keep_cwd(repo_root):
-		sp.run(['git', 'submodule', 'deinit', '-f', '--', path])
-		rmtree(path.join(repo_root, path))
-		sp.run(['git', 'rm', path])

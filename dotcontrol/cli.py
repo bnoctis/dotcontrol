@@ -1,5 +1,6 @@
 import click
 from .control import Control
+from .profile import Profile
 from .util import timestamp2iso
 
 
@@ -31,24 +32,24 @@ def list_dots(profile, all, detail):
 		if not profile:
 			profiles = (control.current_profile,)
 		else:
-			profiles = (control.get_profile(name) for name in profile.split(','))
+			profiles = (Profile.get(control, name) for name in profile.split(','))
 	for profile in profiles:
 		click.secho(profile.name, fg='cyan')
 		for dot in profile.iter_dots():
 			if dot.changed:
 				click.secho('* ', fg='red', nl=False)
 			if detail:
-				click.secho(timestamp2iso(dot.last_sha1_check), nl=False)
+				click.secho(timestamp2iso(dot.data['last_sha1_check']), nl=False)
 				click.echo(' ', nl=False)
 			click.secho(dot.normalized_origin_path, bold=(dot.type =='dir'), nl=not detail)
 			if detail:
 				click.echo(' ', nl=False)
 				if dot.type == 'file':
-					click.echo(dot.sha1)
+					click.echo(dot.data['sha1'])
 				elif dot.type == 'dir':
 					click.echo()
-					for k in dot.sha1:
-						click.echo('{} {}'.format(dot.sha1[k], k))
+					for k in dot.data['sha1']:
+						click.echo('{} {}'.format(dot.data['sha1'][k], k))
 
 
 @cli.command('+', help='add or update dot(s).')
@@ -58,7 +59,7 @@ def set_dots(profile, paths):
 	if not profile:
 		profile = control.current_profile
 	else:
-		profile = control.get_profile(profile)
+		profile = Profile.get(control, profile)
 	
 	for path in paths:
 		dot = profile.set_dot(path)
@@ -73,7 +74,7 @@ def delete_dots(profile, paths):
 	if not profile:
 		profile = control.current_profile
 	else:
-		profile = control.get_profile(profile)
+		profile = Profile.get(control, profile)
 	
 	for path in paths:
 		profile.delete_dot(path)
@@ -96,9 +97,10 @@ def list_or_switch_profile(profile):
 
 @cli.command('p=', help='set up remote profile.')
 @click.argument('type') 
-@click.argument('args', nargs=-1, required=True)
-def setup_remote_profile(type, args):
-	control.setup_profile(type, args)
+@click.argument('remote')
+@click.argument('name', required=False)
+def setup_remote_profile(type, remote, name=None, *args):
+	Profile.create_from_remote(control, type, remote, name, *args)
 
 
 @cli.command('p-', help='delete profile(s).')
@@ -106,24 +108,24 @@ def setup_remote_profile(type, args):
 def delete_profiles(profile):
 	for name in profile:
 		if name == control.current_profile.name:
-			click.secho('! keeping currently in use profile', fg='red', nl=False)
+			click.secho('! keeping currently in use profile ', fg='red', nl=False)
 			click.secho(name, fg='cyan')
 			continue
-		control.delete_profile(name)
+		Profile.get(control, name).delete()
 
 
 @cli.command('=+', help='set up sync.')
 @click.argument('type')
 @click.argument('remote', type=str)
-def set_sync(type, remote):
-	control.set_sync(type, remote)
+def sync_setup(type, remote):
+	control.current_profile.sync_setup(type, remote)
 
 
 @cli.command('=.', context_settings=ctx_pass_through_args, help='commit changes. may add arguments of configured sync program.')
 @click.argument('args', nargs=-1, type=click.UNPROCESSED)
 def commit_changes(args):
 	try:
-		control.commit_changes(*args)
+		control.current_profile.commit(*args)
 	except Exception as e:
 		click.secho('Error: ', fg='bright_red', nl=False)
 		click.echo(e)
@@ -133,7 +135,7 @@ def commit_changes(args):
 @click.argument('args', nargs=-1, type=click.UNPROCESSED)
 def sync_pull(args):
 	try:
-		control.sync_pull(*args)
+		control.current_profile.sync_pull(*args)
 	except Exception as e:
 		click.secho('Error: ', fg='bright_red', nl=False)
 		click.echo(e)
@@ -143,7 +145,7 @@ def sync_pull(args):
 @click.argument('args', nargs=-1, type=click.UNPROCESSED)
 def sync_push(args):
 	try:
-		control.sync_push(*args)
+		control.current_profile.sync_push(*args)
 	except Exception as e:
 		click.secho('Error: ', fg='bright_red', nl=False)
 		click.echo(e)
@@ -154,12 +156,12 @@ def sync_push(args):
 def sync_info_or_run_command(args):
 	if len(args) is 0:
 		click.secho('sync type', fg='cyan', nl=False)
-		click.echo(': {}'.format(control.config['sync_type']))
+		click.echo(': {}'.format(control.current_profile.config['sync_type']))
 		click.secho('sync remote', fg='cyan', nl=False)
-		click.echo(': {}'.format(control.config['sync_remote']))
+		click.echo(': {}'.format(control.current_profile.config['sync_remote']))
 	else:
 		try:
-			control.sync_command(*args)
+			control.current_profile.sync_command(*args)
 		except Exception as e:
 			click.secho('Error: ', fg='bright_red', nl=False)
 			click.echo(e)

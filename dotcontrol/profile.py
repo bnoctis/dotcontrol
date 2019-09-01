@@ -1,82 +1,98 @@
+import toml
 from .dot import Dot
+from .util import mkdirp, read_config, write_config
+from .remote import get_remote
+from .const import PROFILE_CONFIG_TEMPLATE
 
 
 class Profile:
-	def __init__(self, control, name, create=True):
-		self.control, self.name = control, name
-		self.root_path = control.profiles_path.joinpath(name)
-		self.dot_root_path = self.root_path.joinpath('root')
-		self.dot_home_path = self.root_path.joinpath('home')
+	@classmethod
+	def get(cls, control, name):
+		paths = cls.resolve_path(control, name)
+		if paths['config_path'].exists():
+			return cls(control, name)
 
-		if name in control.config['profiles']:
-			self.load()
-		else:
-			if create:
-				self.create()
-			else:
-				raise Exception('profile {} does not exist'.format(name))
-	
-	def create(self):
-		from .const import PROFILE_CONFIG_TEMPLATE
-		from .util import mkdirp
-		mkdirp(self.dot_root_path)
-		mkdirp(self.dot_home_path)
-		self.control.config['profiles'][self.name] = self.config = PROFILE_CONFIG_TEMPLATE.copy()
-		self.save()
-	
-	def remote_setup(self, type, name=None, *args):
-		if type == 'git':
-			if not name:
-				from os.path import basename
-				name = basename(name)
-				if name.endswith('.git'):
-					name = name[:-4]
-			remote = args[0]
+	@classmethod
+	def create(cls, control, name, *args, **kwargs):
+		paths = cls.resolve_path(control, name)
+		mkdirp(paths['dot_root_path'])
+		mkdirp(paths['dot_home_path'])
 
-			with keep_cwd(self.control.root_path):
-				sp.run(['git', 'submodule', 'add', remote, name], check=True)
-				sp.run(['git', 'add', '.'])
+		write_config(paths['config_path'], PROFILE_CONFIG_TEMPLATE.copy())
+
+		return cls(control, name)
+	
+	@classmethod
+	def resolve_path(cls, control, name):
+		root_path = control.profiles_path.joinpath(name)
+		return {
+			'root_path': root_path,
+			'config_path': root_path.joinpath('dotcontrol.toml'),
+			'dot_root_path': root_path.joinpath('root'),
+			'dot_home_path': root_path.joinpath('home')
+		}
+	
+	@classmethod
+	def create_from_remote(cls, control, type, remote_location, name=None, *args):
+		remote = get_remote(type)
+
+		if not name:
+			name = remote.get_name(remote_location, *args)
+
+		config_path = cls.resolve_path(control, name)['config_path']
+		config = read_config(config_path)
+		if not config:
+			config = PROFILE_CONFIG_TEMPLATE.copy()
+		config['sync_type'] = type
+
+		remote.create_from(control, remote_location, name, config, *args)
 		
-		self.control.config['profiles'][self.name] = self.config = PROFILE_CONFIG_TEMPLATE.copy()
-		self.config['sync_type'] = type
-		self.config['sync_remote'] = remote
-		self.save()
+		write_config(config_path, config)
+		
+	def __init__(self, control, name):
+		self.control, self.name = control, name
+		self.__dict__.update(self.resolve_path(control, name))
+
+		if not self.exists:
+			raise Exception('Profile {} does not exist'.format(name))
+		try:
+			self.load()
+		except:
+			raise Exception('Profile {} failed reading configuration file'.format(name))
+		
+		self.remote = get_remote(self.config['sync_type'])
+		
+	@property
+	def exists(self):
+		return self.config_path.exists()
 
 	def load(self):
-		self.config = self.control.config['profiles'][self.name]
+		self.config = read_config(self.config_path)
 	
 	def save(self):
-		self.control.save()
+		write_config(self.config_path, self.config)
 	
 	def delete(self):
-		if self.config['sync_type'] == 'git':
-			from .util import delete_git_submodule
-			relative_path = self.root_path.relative_to(self.control.root_path)
-			delete_git_submodule(self.control.root_path, relative_path)
-		elif self.config['sync_type'] == 'local':
-			from shutil import rmtree
-			rmtree(self.root_path)
-		
-		del self.control.config['profiles'][self.name]
-		self.control.save()
+		from shutil import rmtree
+		rmtree(self.root_path)
 
 	def set_dot(self, path):
 		dot = Dot(self, path)
-		dot.update_sha1_check()
+		dot.create()
 		self.save()
 		if not dot.dot_exists or dot.type == 'dir' and dot.changed:
 			dot.link_dot()
 		return dot
 
 	def delete_dot(self, path):
-		Dot(self, path, create=False).delete()
+		Dot(self, path).delete()
 	
 	def get_dot(self, path):
-		return Dot(self, path, create=False)
+		return Dot.get(self, path)
 
 	def iter_dots(self):
 		for path in self.config['dots']:
-			yield self.get_dot(path)
+			yield Dot(self, path)
 
 	def activate(self):
 		for dot in self.iter_dots():
@@ -90,6 +106,25 @@ class Profile:
 			if dot.changed:
 				raise Exception('{} has been changed and not committed yet!'.format(dot.normalized_origin_path))
 	
-	def update_dot_checks(self):
+	def update_dot_sha1_checks(self):
 		for dot in self.iter_dots():
 			dot.update_sha1_check()
+		self.save()
+	
+	def sync_setup(self, type, remote_location, *args):
+		self.remote = get_remote(type)
+		self.remote.setup(self, remote_location, self.config, *args)
+		self.save()
+
+	def sync_command(self, *args):
+		return self.remote.command(self, *args)
+
+	def sync_commit(self, *args):
+		self.update_dot_sha1_checks()
+		return self.remote.commit(self, *args)
+	
+	def sync_pull(self, *args):
+		return self.remote.pull(self, *args)
+
+	def sync_push(self, *args):
+		return self.remote.push(self, *args)
