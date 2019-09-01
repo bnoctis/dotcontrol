@@ -1,3 +1,84 @@
 = dotcontrol: a dot file manager
 
+== features
 
+* hard link files, no symlinks involved
+* support syncing programs like `git`
+* 
+
+== install
+
+`pip install dotcontrol`
+
+== commands
+
+`.c . [-p profile[,profile..] [-a] [-l]`
+
+List all dots in specified profile(s).
+
+If no argument given, list current profile.
+
+If `-p` flag is set, list dots in specified profile(s).
+Join profile names with comma and no whitespace between.
+
+If `-a` is set, list dots in all profiles.
+
+If `-l` is set, also list last check time and SHA1 of dots.
+
+`.c + path [path..]`
+
+Add or update one or more dots.
+
+`.c - path [path..]`
+
+Delete one or more dots. Source file(s) won't be deleted.
+
+`.c p [profile]`
+
+If no profile name given, list profiles.
+
+If given a profile name, create it of didn't exist, then switch to it.
+
+`.c p- profile [profile..]`
+
+Delete one or more profiles. Source file(s) won't be deleted.
+
+`.c p= type remote`
+
+Set up a remote profile. Currently supports
+
+* git submodule, with `type` set to `git`.
+
+`.c =+ type remote`
+
+Set up remote sync. Currently supports
+
+* git, with `type` set to `git`.
+
+`.c = [command [args..]]`
+
+If no argument given, show sync info.
+
+If given arguments, pass command(s) and / or argument(s) to
+configured sync program.
+
+`.c =. [command [args]]`
+
+Commit current staged changes.
+
+If given arguments, pass command(s) and / or argument(s) to
+underlying sync program.
+
+`.c =] [command [args..]]`
+
+Push changes to remote.
+
+If given arguments, pass command(s) and / or argument(s) to
+underlying sync program.
+
+`.c [= [command [args..]]`
+
+Pull changes from remote.
+
+If given arguments, pass command(s) and / or argument(s) to
+underlying sync program.
