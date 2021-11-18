@@ -1,84 +1,101 @@
 = dotcontrol: a dot file manager
 
-== features
-
-* hard link files, no symlinks involved
-* support syncing programs like `git`
-* 
-
 == install
 
-`pip install dotcontrol`
+`cargo install dotcontrol`
+
+== a little glossary
+
+- *dot* a tracked file in a profile
+- *profile* a set of dots, can be combined
 
 == commands
 
-`.c . [-p profile[,profile..] [-a] [-l]`
+=== `.c`
 
-List all dots in specified profile(s).
+Show info about current profile.
 
-If no argument given, list current profile.
+=== `.c profile`
 
-If `-p` flag is set, list dots in specified profile(s).
-Join profile names with comma and no whitespace between.
+Switch to profile `profile`, create first if didn't exist.
+Obviously, don't name it after following commands.
 
-If `-a` is set, list dots in all profiles.
+=== `.c i profile [profile...]`
 
-If `-l` is set, also list last check time and SHA1 of dots.
+Show info about specified profile(s), all if `-a`.
 
-`.c + path [path..]`
+=== `.c ia`
+
+Show info about all profiles.
+
+=== `.c + path [path...] [-p profile[,profile...]] [-a]`
 
 Add or update one or more dots.
 
-`.c - path [path..]`
+If `-p`, add to specified profile(s).
 
-Delete one or more dots. Source file(s) won't be deleted.
+If `-a`, add to all profiles.
 
-`.c p [profile]`
+=== `.c ++ app [app...]`
 
-If no profile name given, list profiles.
+Add or update dots following preset `app`(s).
 
-If given a profile name, create it of didn't exist, then switch to it.
+=== `.c - path [path...] [-p profile[,profile...]] [-a]`
 
-`.c p- profile [profile..]`
+Delete one or more dots, i.e. stop tracking.
 
-Delete one or more profiles. Source file(s) won't be deleted.
+If `-p`, delete in specified profile(s).
 
-`.c p= type remote`
+If `-a`, delete in all profiles.
 
-Set up a remote profile. Currently supports
+=== `.c -- app [app...]`
 
-* git , with `type` set to `git`.
+Delete dots following preset `app`(s).
 
-`.c =+ type remote`
+=== `.c lp`
 
-Set up remote sync. Currently supports
+List available presets.
 
-* git, with `type` set to `git`.
+=== `.c p- profile [profile...]`
 
-`.c = [command [args..]]`
+Delete one or more profiles.
 
-If no argument given, show sync info.
+=== `.c p= type remote`
 
-If given arguments, pass command(s) and / or argument(s) to
-configured sync program.
+Clone remote profile, setting it up as remote.
 
-`.c =. [command [args]]`
+=== `.c =+ type remote [name]`
 
-Commit current staged changes.
+Set up sync. Optionally name it, `remote` by default.
 
-If given arguments, pass command(s) and / or argument(s) to
-underlying sync program.
+=== `.c =- name [name...]`
 
-`.c =] [command [args..]]`
+Shut down specified sync.
+
+=== `.c = [profile [profile...]] [-a]`
+
+Show sync info for current, specified or all (`-a`) profile(s).
+
+=== `.c ==`
+
+Sync currently staged changes. Push to remote if local is newer, and vice versa.
+
+If given arguments, pass to underlying sync program.
+
+=== `.c =]`
 
 Push changes to remote.
 
-If given arguments, pass command(s) and / or argument(s) to
-underlying sync program.
+If given arguments, pass to underlying sync program.
 
-`.c [= [command [args..]]`
+=== `.c [=`
 
 Pull changes from remote.
 
-If given arguments, pass command(s) and / or argument(s) to
-underlying sync program.
+If given arguments, pass to underlying sync program.
+
+== license
+
+BSD-3-Clause
+
+(c) 2021 Blair Noctis
