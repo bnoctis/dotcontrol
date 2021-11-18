@@ -2,7 +2,13 @@
 
 == install
 
-`cargo install dotcontrol`
+With https://rustup.rs[rustup] and nightly toolchain (`rustup toolchain install nightly`) installed:
+
+* `cargo +nightly install dotcontrol`
+
+This is due to a limitation in Rust and Cargo, that the binary file and crate are the same name.
+A solution is https://github.com/rust-lang/cargo/issues/9778[being implemented],
+and currently requires nightly.
 
 == a little glossary
 

@@ -1,8 +1,15 @@
+cargo-features = ['different-binary-name']
+
 [package]
 name = 'dotcontrol'
 description = 'a dot file manager'
 version = '0.0.0'
 edition = '2021'
 license = 'BSD-3-Clause'
+
+[[bin]]
+name = 'dotcontrol'
+filename = '.c'
+path = 'src/main.rs'
 
 [dependencies]
